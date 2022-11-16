@@ -1,0 +1,52 @@
+name: cea
+channels:
+- conda-forge
+- defaults
+dependencies:
+- deap
+- ephem
+- flask=1.1.4
+- jinja2=2.11.3
+- itsdangerous=1.1.0
+- flask-cors
+- flask-restplus
+- flask-socketio=4.3.2
+- gevent
+- gevent-websocket
+- ipykernel
+- ipython
+- jupyter
+- openpyxl
+- plotly
+- sphinx
+- sympy
+- utm
+- wntr=0.2.2.1
+- fiona
+- gdal=3.3.*
+- geopandas
+- matplotlib
+- networkx
+- numba
+- numpy
+- numpy-financial
+- osmnx=0.15.1
+- pandas
+- pip
+- psutil
+- pysal=2.1.0
+- python>=3.7
+- pythonocc-core=7.4.1
+- pytz
+- pvlib-python
+- scipy
+- setuptools
+- shapely
+- pyyaml
+- timezonefinder
+- python-cufflinks
+- pip:
+  - xlrd
+  - xlwt
+  - staticmap
+  - py4design-cea
