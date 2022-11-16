@@ -1,10 +1,10 @@
-import csv
 import pandas as pd
 import geopandas as gpd
 from datetime import datetime
 from multiprocessing import Pool, cpu_count
 
 
+# 건물 용도에 따른 연중 전체 취사 시간(total_hours) 및 일별 취사 시간(result) 계산
 def cooking_hours(db_path, usage):
     meal_hour = [7, 8, 9, 11, 12, 13, 17, 18, 19]
     occupancy_file = f"{db_path}/inputs/technology/archetypes/use_types/{usage}.csv"
@@ -18,17 +18,7 @@ def cooking_hours(db_path, usage):
     return total_hours, result
 
 
-def agricultural_hours(db_path):
-    occupancy_file = f"{db_path}/archetypes/use_types/AGRICULTURAL.csv"
-    with open(occupancy_file, 'r') as fr:
-        rdr = list(csv.reader(fr))
-        week_day = [float(i[2]) for i in rdr if i[0] == 'WEEKDAY' and i[1]]
-        sat_day = [float(i[2]) for i in rdr if i[0] == 'SATURDAY' and i[1]]
-        sun_day = [float(i[2]) for i in rdr if i[0] == 'SUNDAY' and i[1]]
-        total_hours = sum(week_day) * 246 + sum(sat_day) * 52 + sum(sun_day) * 67
-        return total_hours, week_day, sat_day, sun_day
-
-
+# CEA 결과 데이터에 취사 에너지 추가 (데이터프레임 수정)
 def fill_cooking(row, usage, area, path, cooking_loads):
     total_hours, result = cooking_hours(path, usage)
     week_day = result['WEEKDAY']
@@ -55,32 +45,18 @@ def fill_cooking(row, usage, area, path, cooking_loads):
         return 0
 
 
-def fill_agriculture(row, usage, area):
-    total_hours, week_day, sat_day, sun_day = agricultural_hours()
-    day = datetime.fromisoformat(row['DATE']).weekday()
-    hour = datetime.fromisoformat(row['DATE']).time().hour
-    if usage == 'AGRICULTURAL':
-        if day in range(5):
-            if week_day[hour] != 0:
-                return 5.543257971 * area * 0.2777778 * 37.7 / total_hours
-            else:
-                return 0
-        elif day == 5:
-            if sat_day[hour] != 0:
-                return 5.543257971 * area * 0.2777778 * 37.7 / total_hours
-            else:
-                return 0
-        elif day == 6:
-            if sun_day[hour] != 0:
-                return 5.543257971 * area * 0.2777778 * 37.7 / total_hours
-            else:
-                return 0
-        else:
-            return 0
-    else:
-        return 0
+# CEA 결과 데이터에 취사 에너지 추가
+def calculate_cooking_loads(item):
+    path = item['path']
+    area = item['AREA']
+    cook = item['cooking']
+    usage = item['1ST_USE']
+    data = pd.read_csv(path)
+    data['cooking'] = data.apply(fill_cooking, axis=1, args=(usage, area, path, cook))
+    data.to_csv(path)
 
 
+# 건축물 용도와 면적 정보 계산
 def get_building_info(db_path):
     architecture = gpd.read_file(f'{db_path}/inputs/building-properties/architecture.dbf')
     architecture.drop(columns=['geometry'], inplace=True)
@@ -94,6 +70,7 @@ def get_building_info(db_path):
     return building
 
 
+# 건물 용도별 단위면적당 연간 취사 에너지 소요량 parsing
 def get_cooking_loads(db_path, energy_type):
     building_info = get_building_info(db_path)
     internal_loads = pd.read_excel(f"{db_path}/inputs/technology/archetypes/use_types/USE_TYPE_PROPERTIES.xlsx",
@@ -106,23 +83,17 @@ def get_cooking_loads(db_path, energy_type):
     return building_info
 
 
-def calculate_cooking_loads(item):
-    path = item['path']
-    area = item['AREA']
-    cook = item['cooking']
-    usage = item['1ST_USE']
-    data = pd.read_csv(path)
-    data['cooking'] = data.apply(fill_cooking, axis=1, args=(usage, area, path, cook))
-    data.to_csv(path)
-
-
-def process_cooking_loads(db_path, energy_type):
+def process_cooking_loads(db_path, energy_type, multi_processing=True):
     check_energy_type(energy_type)
     building_info = get_cooking_loads(db_path, energy_type)
     building_info['path'] = db_path
     data = list(building_info.transpose().to_dict())
-    multi = cpu_count() - 1
-    Pool(multi).map(calculate_cooking_loads, data)
+    if multi_processing:
+        multi = cpu_count() - 1
+        Pool(multi).map(calculate_cooking_loads, data)
+    else:
+        for datum in data:
+            calculate_cooking_loads(datum)
 
 
 def check_energy_type(energy_type):
@@ -135,7 +106,11 @@ def check_energy_type(energy_type):
 def main():
     energy_type = input('Please input the energy type (NG or E): ')
     db_path = input("Please input CEA scenario path: ")
-    process_cooking_loads(db_path, energy_type)
+    multi = input("Are you going to run multiprocessing? (y/n) : ")
+    if multi == 'y':
+        process_cooking_loads(db_path, energy_type)
+    elif multi == 'n':
+        process_cooking_loads(db_path, energy_type, multi_processing=False)
 
 
 if __name__ == '__main__':
