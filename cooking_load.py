@@ -48,12 +48,14 @@ def fill_cooking(row, usage, area, path, cooking_loads):
 # CEA 결과 데이터에 취사 에너지 추가
 def calculate_cooking_loads(item):
     path = item['path']
+    name = item['Name']
     area = item['AREA']
     cook = item['cooking']
     usage = item['1ST_USE']
-    data = pd.read_csv(path)
+    data_location = f"{path}/outputs/data/demand/{name}"
+    data = pd.read_csv(data_location)
     data['cooking'] = data.apply(fill_cooking, axis=1, args=(usage, area, path, cook))
-    data.to_csv(path)
+    data.to_csv(data_location)
 
 
 # 건축물 용도와 면적 정보 계산
